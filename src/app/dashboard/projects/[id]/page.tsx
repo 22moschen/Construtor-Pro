@@ -1,3 +1,4 @@
+
 "use client";
 
 import { Button } from "@/components/ui/button";
@@ -9,6 +10,7 @@ import Link from "next/link";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import React, { useState, useEffect } from "react";
 
 // Mock data - replace with actual data fetching based on params.id
 const projectData = {
@@ -46,6 +48,7 @@ const getStatusBadgeClass = (status: string) => {
 export default function ProjectDetailsPage({ params }: { params: { id: string } }) {
   // In a real app, fetch project by params.id
   const project = projectData; 
+  const [bdiPercentage, setBdiPercentage] = useState<number>(project.bdiPercentage);
 
   if (!project) {
     return <p>Projeto não encontrado.</p>;
@@ -54,8 +57,22 @@ export default function ProjectDetailsPage({ params }: { params: { id: string } 
   const totalMaterialsCost = project.budgetItems.filter(item => item.type === "Material").reduce((sum, item) => sum + item.total, 0);
   const totalServicesCost = project.budgetItems.filter(item => item.type === "Serviço").reduce((sum, item) => sum + item.total, 0);
   const subTotalCost = totalMaterialsCost + totalServicesCost;
-  const bdiValue = subTotalCost * (project.bdiPercentage / 100);
+  const bdiValue = subTotalCost * (bdiPercentage / 100);
   const totalProjectCost = subTotalCost + bdiValue;
+
+  const handleBdiChange = (event: React.ChangeEvent<HTMLInputElement>) => {
+    const value = event.target.value;
+    // Allow empty string for user to clear input, otherwise parse to number
+    if (value === "") {
+      setBdiPercentage(0); // Or handle as an error/specific state if preferred
+    } else {
+      const numericValue = parseFloat(value);
+      if (!isNaN(numericValue)) {
+        setBdiPercentage(numericValue);
+      }
+    }
+  };
+
 
   return (
     <div className="space-y-8">
@@ -185,9 +202,9 @@ export default function ProjectDetailsPage({ params }: { params: { id: string } 
                   <Input 
                     type="number" 
                     id="bdi" 
-                    defaultValue={project.bdiPercentage} 
+                    value={bdiPercentage} 
+                    onChange={handleBdiChange}
                     className="max-w-[100px] text-right h-8"
-                    // Add onChange to update BDI state
                   />
                 </div>
                 <div className="flex justify-between">
@@ -207,3 +224,4 @@ export default function ProjectDetailsPage({ params }: { params: { id: string } 
     </div>
   );
 }
+
