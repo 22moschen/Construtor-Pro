@@ -56,7 +56,7 @@ export function DashboardNav() {
     <SidebarMenu>
       {navItems.map((item) => (
         <SidebarMenuItem key={item.label}>
-          <Link href={item.href}>
+          <Link href={item.href} asChild>
             <SidebarMenuButton
               asChild
               className={cn(
@@ -77,3 +77,4 @@ export function DashboardNav() {
     </SidebarMenu>
   );
 }
+
