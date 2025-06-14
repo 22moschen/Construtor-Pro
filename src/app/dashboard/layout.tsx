@@ -21,7 +21,7 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import { Building2, LogOut, UserCircle } from "lucide-react";
+import { Building2, LogOut, UserCircle, Settings } from "lucide-react";
 import { DashboardNav } from "@/components/dashboard-nav";
 import { useIsMobile } from "@/hooks/use-mobile";
 
