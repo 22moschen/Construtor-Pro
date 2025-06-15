@@ -1,5 +1,9 @@
+
+"use client";
+
+import React, { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"; // Removido CardFooter não utilizado
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
 import { PlusCircle, Edit, Trash2, Eye, MoreHorizontal } from "lucide-react";
@@ -10,23 +14,15 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-
-// Mock data - replace with actual data fetching
-const projects = [
-  { id: "1", name: "Construção Residencial Alpha", client: "João Silva", status: "Em Andamento", startDate: "01/03/2024", endDate: "30/09/2024", budget: 120000 },
-  { id: "2", name: "Reforma Comercial Beta", client: "Maria Oliveira", status: "Concluído", startDate: "15/01/2024", endDate: "15/04/2024", budget: 75000 },
-  { id: "3", name: "Planejamento Edifício Gamma", client: "Construtora XYZ", status: "Planejamento", startDate: "10/05/2024", endDate: "10/12/2024", budget: 500000 },
-  { id: "4", name: "Pintura Externa Delta", client: "Ana Costa", status: "Orçamento", startDate: "20/07/2024", endDate: "30/07/2024", budget: 15000 },
-  { id: "5", name: "Instalação Hidráulica Epsilon", client: "Pedro Santos", status: "Aprovado", startDate: "01/08/2024", endDate: "15/08/2024", budget: 25000 },
-];
+import type { Project } from "./new/page"; // Importar o tipo Project
 
 const getStatusBadgeVariant = (status: string) => {
   switch (status) {
     case "Em Andamento": return "default";
-    case "Concluído": return "secondary"; // Will use CSS for green-like color
-    case "Planejamento": return "outline"; // Will use CSS for purple-like color
+    case "Concluído": return "secondary";
+    case "Planejamento": return "outline";
     case "Orçamento": return "outline";
-    case "Aprovado": return "default"; // Will use CSS for another color
+    case "Aprovado": return "default";
     default: return "secondary";
   }
 };
@@ -45,6 +41,29 @@ const getStatusBadgeClass = (status: string) => {
 
 
 export default function ProjectsPage() {
+  const [projects, setProjects] = useState<Project[]>([]);
+
+  useEffect(() => {
+    const storedProjects = localStorage.getItem("projects");
+    if (storedProjects) {
+      try {
+        setProjects(JSON.parse(storedProjects));
+      } catch (error) {
+        console.error("Erro ao parsear projetos do localStorage:", error);
+        setProjects([]);
+      }
+    }
+  }, []);
+
+  const handleDeleteProject = (projectId: string) => {
+    if (confirm("Tem certeza que deseja excluir este projeto? Esta ação não poderá ser desfeita.")) {
+      const updatedProjects = projects.filter(p => p.id !== projectId);
+      setProjects(updatedProjects);
+      localStorage.setItem("projects", JSON.stringify(updatedProjects));
+      // Adicionar toast aqui se desejar (ex: useToast().toast({ title: "Projeto excluído!" }))
+    }
+  };
+
   return (
     <div className="space-y-8">
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center">
@@ -78,16 +97,18 @@ export default function ProjectsPage() {
             <TableBody>
               {projects.map((project) => (
                 <TableRow key={project.id} className="font-body hover:bg-muted/50">
-                  <TableCell className="font-medium">{project.name}</TableCell>
-                  <TableCell>{project.client}</TableCell>
+                  <TableCell className="font-medium">{project.projectName}</TableCell>
+                  <TableCell>{project.clientName}</TableCell>
                   <TableCell>
                     <Badge variant={getStatusBadgeVariant(project.status) as any} className={getStatusBadgeClass(project.status)}>
                       {project.status}
                     </Badge>
                   </TableCell>
-                  <TableCell>{project.startDate}</TableCell>
-                  <TableCell>{project.endDate}</TableCell>
-                  <TableCell className="text-right">{project.budget.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</TableCell>
+                  <TableCell>{project.startDate ? new Date(project.startDate).toLocaleDateString('pt-BR') : 'N/A'}</TableCell>
+                  <TableCell>{project.endDate ? new Date(project.endDate).toLocaleDateString('pt-BR') : 'N/A'}</TableCell>
+                  <TableCell className="text-right">
+                    {project.budget !== undefined ? project.budget.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' }) : 'N/A'}
+                  </TableCell>
                   <TableCell className="text-center">
                     <DropdownMenu>
                       <DropdownMenuTrigger asChild>
@@ -98,16 +119,19 @@ export default function ProjectsPage() {
                       </DropdownMenuTrigger>
                       <DropdownMenuContent align="end">
                         <DropdownMenuItem asChild>
-                          <Link href={`/dashboard/projects/${project.id}`} className="flex items-center">
+                          <Link href={`/dashboard/projects/${project.id}`} className="flex items-center cursor-pointer">
                             <Eye className="mr-2 h-4 w-4" /> Detalhes / Orçamento
                           </Link>
                         </DropdownMenuItem>
                         <DropdownMenuItem asChild>
-                           <Link href={`/dashboard/projects/${project.id}?edit=true`} className="flex items-center">
+                           <Link href={`/dashboard/projects/edit/${project.id}`} className="flex items-center cursor-pointer"> {/* Idealmente uma página de edição separada ou query param */}
                             <Edit className="mr-2 h-4 w-4" /> Editar
                           </Link>
                         </DropdownMenuItem>
-                        <DropdownMenuItem className="text-destructive focus:text-destructive focus:bg-destructive/10">
+                        <DropdownMenuItem 
+                          onClick={() => handleDeleteProject(project.id)} 
+                          className="text-destructive focus:text-destructive focus:bg-destructive/10 cursor-pointer"
+                        >
                           <Trash2 className="mr-2 h-4 w-4" /> Excluir
                         </DropdownMenuItem>
                       </DropdownMenuContent>
@@ -123,3 +147,5 @@ export default function ProjectsPage() {
     </div>
   );
 }
+
+    

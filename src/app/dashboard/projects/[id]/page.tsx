@@ -11,27 +11,7 @@ import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import React, { useState, useEffect } from "react";
-
-// Mock data - replace with actual data fetching based on params.id
-const projectData = {
-  id: "1",
-  name: "Construção Residencial Alpha",
-  client: "João Silva",
-  contact: "(11) 98765-4321",
-  address: "Rua das Palmeiras, 123, Bairro Sol Nascente, Cidade Feliz - SP",
-  description: "Construção de uma residência unifamiliar térrea com 3 quartos, sala, cozinha, 2 banheiros e área de serviço. Área total de 150m².",
-  startDate: "01/03/2024",
-  endDate: "30/09/2024",
-  status: "Em Andamento",
-  totalArea: "150m²",
-  budgetItems: [
-    { id: "m1", type: "Material", name: "Tijolo Cerâmico 8 Furos", unit: "Milheiro", quantity: 15, unitPrice: 800, total: 12000 },
-    { id: "m2", type: "Material", name: "Cimento CPII Saco 50kg", unit: "Saco", quantity: 200, unitPrice: 28, total: 5600 },
-    { id: "s1", type: "Serviço", name: "Assentamento de Alvenaria", unit: "m²", quantity: 300, unitPrice: 25, total: 7500 },
-    { id: "s2", type: "Serviço", name: "Instalação Elétrica Ponto", unit: "Ponto", quantity: 80, unitPrice: 70, total: 5600 },
-  ],
-  bdiPercentage: 25, // Example BDI
-};
+import type { Project, BudgetItem } from "../new/page"; // Importar o tipo Project
 
 const getStatusBadgeClass = (status: string) => {
   switch (status) {
@@ -46,30 +26,145 @@ const getStatusBadgeClass = (status: string) => {
 }
 
 export default function ProjectDetailsPage({ params }: { params: { id: string } }) {
-  // In a real app, fetch project by params.id
-  const project = projectData; 
-  const [bdiPercentage, setBdiPercentage] = useState<number>(project.bdiPercentage);
+  const [project, setProject] = useState<Project | null>(null);
+  const [bdiPercentage, setBdiPercentage] = useState<number>(25); // Default BDI
+  const [isLoading, setIsLoading] = useState(true);
 
-  if (!project) {
-    return <p>Projeto não encontrado.</p>;
+  useEffect(() => {
+    const storedProjects = localStorage.getItem("projects");
+    if (storedProjects) {
+      try {
+        const allProjects: Project[] = JSON.parse(storedProjects);
+        const currentProject = allProjects.find(p => p.id === params.id);
+        if (currentProject) {
+          setProject(currentProject);
+          setBdiPercentage(currentProject.bdiPercentage || 25);
+        } else {
+          setProject(null);
+        }
+      } catch (error) {
+        console.error("Erro ao carregar detalhes do projeto do localStorage:", error);
+        setProject(null);
+      }
+    }
+    setIsLoading(false);
+  }, [params.id]);
+
+  const handleBdiChange = (event: React.ChangeEvent<HTMLInputElement>) => {
+    const value = event.target.value;
+    let numericValue = 0; // Default to 0 if input is cleared or invalid
+    if (value !== "") {
+        numericValue = parseFloat(value);
+        if (isNaN(numericValue)) {
+            numericValue = bdiPercentage; // Revert to old value if parsing fails
+        }
+    }
+    setBdiPercentage(numericValue);
+
+    if (project) {
+        const updatedProject = { ...project, bdiPercentage: numericValue };
+        const storedProjectsString = localStorage.getItem("projects");
+        if (storedProjectsString) {
+            try {
+                let allProjects: Project[] = JSON.parse(storedProjectsString);
+                allProjects = allProjects.map(p => p.id === project.id ? updatedProject : p);
+                localStorage.setItem("projects", JSON.stringify(allProjects));
+                setProject(updatedProject); // Update local state
+            } catch (error) {
+                console.error("Erro ao atualizar BDI no localStorage:", error);
+            }
+        }
+    }
+  };
+
+  if (isLoading) {
+    return (
+      <div className="flex justify-center items-center h-screen">
+        <p className="font-body text-lg">Carregando detalhes do projeto...</p>
+      </div>
+    );
   }
 
-  const totalMaterialsCost = project.budgetItems.filter(item => item.type === "Material").reduce((sum, item) => sum + item.total, 0);
-  const totalServicesCost = project.budgetItems.filter(item => item.type === "Serviço").reduce((sum, item) => sum + item.total, 0);
+  if (!project) {
+    return (
+      <div className="space-y-8">
+        <Link href="/dashboard/projects" className="flex items-center text-sm text-primary hover:underline mb-6">
+          <ArrowLeft className="mr-2 h-4 w-4" />
+          Voltar para Projetos
+        </Link>
+        <Card className="shadow-xl">
+          <CardHeader>
+            <CardTitle className="text-2xl font-headline text-destructive">Projeto não encontrado</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <p className="font-body">O projeto que você está tentando acessar não foi encontrado. Ele pode ter sido excluído ou o ID é inválido.</p>
+            <Button asChild className="mt-4">
+              <Link href="/dashboard/projects">Ver todos os projetos</Link>
+            </Button>
+          </CardContent>
+        </Card>
+      </div>
+    );
+  }
+
+  const budgetItems: BudgetItem[] = project.budgetItems || [];
+  const totalMaterialsCost = budgetItems.filter(item => item.type === "Material").reduce((sum, item) => sum + item.total, 0);
+  const totalServicesCost = budgetItems.filter(item => item.type === "Serviço").reduce((sum, item) => sum + item.total, 0);
   const subTotalCost = totalMaterialsCost + totalServicesCost;
   const bdiValue = subTotalCost * (bdiPercentage / 100);
   const totalProjectCost = subTotalCost + bdiValue;
 
-  const handleBdiChange = (event: React.ChangeEvent<HTMLInputElement>) => {
-    const value = event.target.value;
-    // Allow empty string for user to clear input, otherwise parse to number
-    if (value === "") {
-      setBdiPercentage(0); // Or handle as an error/specific state if preferred
-    } else {
-      const numericValue = parseFloat(value);
-      if (!isNaN(numericValue)) {
-        setBdiPercentage(numericValue);
-      }
+  // Placeholder para adicionar item ao orçamento
+  const handleAddBudgetItem = () => {
+    // Lógica para adicionar novo item (abrir modal, etc.)
+    // Por enquanto, apenas um log para teste e para adicionar um item mock
+    const newItem: BudgetItem = {
+      id: `item-${Date.now()}`,
+      type: "Material",
+      name: "Novo Material de Teste",
+      unit: "Un",
+      quantity: 10,
+      unitPrice: 5.50,
+      total: 55.00
+    };
+    const updatedProject = {
+      ...project,
+      budgetItems: [...(project.budgetItems || []), newItem]
+    };
+    setProject(updatedProject); // Atualiza o estado local
+
+    // Salva no localStorage
+    const storedProjectsString = localStorage.getItem("projects");
+    if (storedProjectsString) {
+        try {
+            let allProjects: Project[] = JSON.parse(storedProjectsString);
+            allProjects = allProjects.map(p => p.id === project.id ? updatedProject : p);
+            localStorage.setItem("projects", JSON.stringify(allProjects));
+        } catch (error) {
+            console.error("Erro ao adicionar item ao orçamento no localStorage:", error);
+        }
+    }
+    console.log("Adicionar item ao orçamento:", newItem);
+  };
+  
+  const handleDeleteBudgetItem = (itemId: string) => {
+    if (!project || !project.budgetItems) return;
+    if (confirm("Tem certeza que deseja excluir este item do orçamento?")) {
+        const updatedBudgetItems = project.budgetItems.filter(item => item.id !== itemId);
+        const updatedProject = { ...project, budgetItems: updatedBudgetItems };
+        setProject(updatedProject); // Atualiza o estado local
+
+        // Salva no localStorage
+        const storedProjectsString = localStorage.getItem("projects");
+        if (storedProjectsString) {
+            try {
+                let allProjects: Project[] = JSON.parse(storedProjectsString);
+                allProjects = allProjects.map(p => p.id === project.id ? updatedProject : p);
+                localStorage.setItem("projects", JSON.stringify(allProjects));
+            } catch (error) {
+                console.error("Erro ao excluir item do orçamento no localStorage:", error);
+            }
+        }
     }
   };
 
@@ -85,27 +180,26 @@ export default function ProjectDetailsPage({ params }: { params: { id: string } 
         <CardHeader className="flex flex-col sm:flex-row justify-between items-start sm:items-center">
           <div>
             <CardTitle className="text-3xl font-headline flex items-center">
-              {project.name}
+              {project.projectName}
               <Badge className={`ml-3 text-sm ${getStatusBadgeClass(project.status)}`}>{project.status}</Badge>
             </CardTitle>
             <CardDescription className="font-body mt-1">Detalhes e orçamento do projeto.</CardDescription>
           </div>
           <div className="mt-4 sm:mt-0 flex space-x-2">
-            <Button variant="outline"><Edit className="mr-2 h-4 w-4" /> Editar Projeto</Button>
-            <Button variant="outline"><Printer className="mr-2 h-4 w-4" /> Imprimir Orçamento</Button>
+            <Button variant="outline" onClick={() => alert("Função Editar Projeto ainda não implementada.")}><Edit className="mr-2 h-4 w-4" /> Editar Projeto</Button>
+            <Button variant="outline" onClick={() => window.print()}><Printer className="mr-2 h-4 w-4" /> Imprimir Orçamento</Button>
           </div>
         </CardHeader>
         <CardContent className="space-y-6">
-          {/* Project Info Section */}
           <section>
             <h2 className="text-xl font-headline mb-3">Informações do Projeto</h2>
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-x-6 gap-y-4 text-sm font-body">
-              <div><strong>Cliente:</strong> {project.client}</div>
-              <div><strong>Contato:</strong> {project.contact}</div>
-              <div><strong>Endereço da Obra:</strong> {project.address}</div>
-              <div><strong>Data de Início:</strong> {project.startDate}</div>
-              <div><strong>Data de Fim Prevista:</strong> {project.endDate}</div>
-              <div><strong>Área Total:</strong> {project.totalArea}</div>
+              <div><strong>Cliente:</strong> {project.clientName}</div>
+              <div><strong>Contato:</strong> {project.clientContact || "N/A"}</div>
+              <div><strong>Endereço da Obra:</strong> {project.workAddress}</div>
+              <div><strong>Data de Início:</strong> {project.startDate ? new Date(project.startDate).toLocaleDateString('pt-BR') : "N/A"}</div>
+              <div><strong>Data de Fim Prevista:</strong> {project.endDate ? new Date(project.endDate).toLocaleDateString('pt-BR') : "N/A"}</div>
+              <div><strong>Área Total:</strong> {project.totalArea || "N/A"}</div>
             </div>
             {project.description && (
               <div className="mt-4">
@@ -117,11 +211,10 @@ export default function ProjectDetailsPage({ params }: { params: { id: string } 
 
           <Separator />
 
-          {/* Budgeting Section */}
           <section>
             <div className="flex justify-between items-center mb-4">
               <h2 className="text-xl font-headline">Orçamento Detalhado</h2>
-              <Button size="sm" variant="outline" className="bg-primary hover:bg-primary/90 text-primary-foreground">
+              <Button size="sm" variant="outline" className="bg-primary hover:bg-primary/90 text-primary-foreground" onClick={handleAddBudgetItem}>
                 <PlusCircle className="mr-2 h-4 w-4" /> Adicionar Item
               </Button>
             </div>
@@ -138,7 +231,7 @@ export default function ProjectDetailsPage({ params }: { params: { id: string } 
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {project.budgetItems.map((item) => (
+                {budgetItems.map((item) => (
                   <TableRow key={item.id} className="font-body hover:bg-muted/50">
                     <TableCell>
                       <Badge variant={item.type === "Material" ? "secondary" : "outline"} className={item.type === "Material" ? "bg-blue-100 text-blue-700" : "bg-green-100 text-green-700"}>
@@ -151,19 +244,19 @@ export default function ProjectDetailsPage({ params }: { params: { id: string } 
                     <TableCell className="text-right">{item.unitPrice.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</TableCell>
                     <TableCell className="text-right">{item.total.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</TableCell>
                     <TableCell className="text-center">
-                      <Button variant="ghost" size="icon" className="h-8 w-8">
+                      <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => alert(`Editar item ${item.id} (não implementado)`)}>
                         <Edit className="h-4 w-4" />
                       </Button>
-                      <Button variant="ghost" size="icon" className="h-8 w-8 text-destructive">
+                      <Button variant="ghost" size="icon" className="h-8 w-8 text-destructive" onClick={() => handleDeleteBudgetItem(item.id)}>
                         <Trash2 className="h-4 w-4" />
                       </Button>
                     </TableCell>
                   </TableRow>
                 ))}
-                {project.budgetItems.length === 0 && (
+                {budgetItems.length === 0 && (
                   <TableRow>
-                    <TableCell colSpan={7} className="text-center text-muted-foreground py-8">
-                      Nenhum item adicionado ao orçamento.
+                    <TableCell colSpan={7} className="text-center text-muted-foreground py-8 font-body">
+                      Nenhum item adicionado ao orçamento. Clique em "Adicionar Item" para começar.
                     </TableCell>
                   </TableRow>
                 )}
@@ -173,9 +266,8 @@ export default function ProjectDetailsPage({ params }: { params: { id: string } 
 
           <Separator />
           
-          {/* Budget Summary Section */}
           <section className="grid grid-cols-1 md:grid-cols-2 gap-6 items-start">
-            <div> {/* Empty div for layout, or add more project details here */} </div>
+            <div> </div>
             <Card className="bg-muted/30">
               <CardHeader>
                 <CardTitle className="font-headline text-lg">Resumo do Orçamento</CardTitle>
@@ -195,7 +287,7 @@ export default function ProjectDetailsPage({ params }: { params: { id: string } 
                   <span>R$ {subTotalCost.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</span>
                 </div>
                  <div className="flex items-center justify-between space-x-2 pt-2">
-                  <Label htmlFor="bdi" className="flex items-center shrink-0">
+                  <Label htmlFor="bdi" className="flex items-center shrink-0 font-body">
                     BDI / Lucro (%):
                     <Percent className="ml-1 h-4 w-4 text-muted-foreground" />
                   </Label>
@@ -204,7 +296,8 @@ export default function ProjectDetailsPage({ params }: { params: { id: string } 
                     id="bdi" 
                     value={bdiPercentage} 
                     onChange={handleBdiChange}
-                    className="max-w-[100px] text-right h-8"
+                    className="max-w-[100px] text-right h-8 font-body"
+                    step="0.1"
                   />
                 </div>
                 <div className="flex justify-between">
@@ -225,3 +318,4 @@ export default function ProjectDetailsPage({ params }: { params: { id: string } 
   );
 }
 
+    
