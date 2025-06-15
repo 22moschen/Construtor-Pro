@@ -1,15 +1,18 @@
 
 "use client";
 
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useCallback } from "react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { Progress } from "@/components/ui/progress"; // Import Progress
-import { Briefcase, CalendarClock, AlertTriangle, CheckCircle2, ListChecks, DollarSign, PlusCircle } from "lucide-react";
+import { Progress } from "@/components/ui/progress";
+import { Briefcase, CalendarClock, AlertTriangle, ListChecks, DollarSign, PlusCircle, Loader2 } from "lucide-react";
 import Link from "next/link";
-import type { Project } from "./projects/new/page";
+import type { Project } from "@/types"; // Importar o tipo Project atualizado
+import { getProjects } from "@/services/projectService"; // Importar serviço
+import { useToast } from "@/hooks/use-toast";
+import { format } from "date-fns";
+import { ptBR } from "date-fns/locale";
 
-// Helper para cores de status (pode ser movido para utils se usado em mais lugares)
 const getStatusVisuals = (status: string) => {
   switch (status) {
     case "Em Andamento": return { textColor: "text-blue-500", bgColor: "bg-blue-500", badgeClass: "bg-blue-100 text-blue-700" };
@@ -25,6 +28,9 @@ const getStatusVisuals = (status: string) => {
 
 export default function DashboardPage() {
   const [projects, setProjects] = useState<Project[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
+  const { toast } = useToast();
+
   // Mock data para tarefas e alertas, pois não temos um sistema de tarefas ainda
   const upcomingTasks = [
     { id: 1, name: "Reunião com cliente - Projeto Alpha", dueDate: "Amanhã, 10:00", project: "Projeto Alpha" },
@@ -35,17 +41,31 @@ export default function DashboardPage() {
     { id: 2, message: "Tarefa 'Comprar Cimento' para 'Obra Beta' está atrasada.", type: "error" },
   ];
 
+  const fetchDashboardData = useCallback(async () => {
+    setIsLoading(true);
+    try {
+      const fetchedProjects = await getProjects();
+      setProjects(fetchedProjects.sort((a, b) => {
+        // Ordena por data de criação, mais recente primeiro
+        const dateA = a.createdAt ? new Date(a.createdAt).getTime() : 0;
+        const dateB = b.createdAt ? new Date(b.createdAt).getTime() : 0;
+        return dateB - dateA;
+      }));
+    } catch (error) {
+      console.error("Erro ao carregar dados do dashboard:", error);
+      toast({
+        title: "Erro ao carregar dados",
+        description: "Não foi possível buscar os projetos.",
+        variant: "destructive",
+      });
+    } finally {
+      setIsLoading(false);
+    }
+  }, [toast]);
 
   useEffect(() => {
-    const storedProjects = localStorage.getItem("projects");
-    if (storedProjects) {
-      try {
-        setProjects(JSON.parse(storedProjects));
-      } catch (error) {
-        console.error("Erro ao carregar projetos para o dashboard:", error);
-      }
-    }
-  }, []);
+    fetchDashboardData();
+  }, [fetchDashboardData]);
 
   const activeProjectsCount = projects.filter(p => p.status === "Em Andamento" || p.status === "Aprovado" || p.status === "Planejamento" || p.status === "Orçamento").length;
   const approvedBudgetsTotal = projects
@@ -59,11 +79,11 @@ export default function DashboardPage() {
     { title: "Orçamentos Aprovados", value: `${approvedBudgetsTotal.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}`, icon: DollarSign, color: "text-green-500" },
   ];
 
-  const recentProjectsData = projects.slice(-3).reverse().map(p => { // Pega os 3 mais recentes
+  const recentProjectsData = projects.slice(0, 3).map(p => { // Pega os 3 mais recentes (já ordenados)
     const visuals = getStatusVisuals(p.status);
-    let progress = 10; // Default progress
+    let progress = 10;
     if (p.status === "Concluído") progress = 100;
-    else if (p.status === "Em Andamento") progress = 60;
+    else if (p.status === "Em Andamento") progress = 60; // Progresso mockado
     else if (p.status === "Aprovado") progress = 30;
     else if (p.status === "Orçamento") progress = 20;
 
@@ -78,6 +98,15 @@ export default function DashboardPage() {
     };
   });
 
+
+  if (isLoading) {
+    return (
+      <div className="flex justify-center items-center min-h-[calc(100vh-10rem)]">
+        <Loader2 className="h-10 w-10 animate-spin text-primary" />
+        <p className="ml-3 font-body text-lg">Carregando dashboard...</p>
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-8">
@@ -176,5 +205,3 @@ export default function DashboardPage() {
     </div>
   );
 }
-
-    

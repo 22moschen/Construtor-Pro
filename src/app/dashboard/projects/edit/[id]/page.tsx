@@ -1,4 +1,4 @@
-
+// src/app/dashboard/projects/edit/[id]/page.tsx
 "use client";
 
 import { Button } from "@/components/ui/button";
@@ -13,21 +13,20 @@ import { cn } from "@/lib/utils";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { format } from "date-fns";
 import { ptBR } from "date-fns/locale";
-import { CalendarIcon, ArrowLeft } from "lucide-react";
+import { CalendarIcon, ArrowLeft, Loader2 } from "lucide-react";
 import Link from "next/link";
-import { useRouter } from "next/navigation";
+import { useRouter, useParams } from "next/navigation"; // useParams para pegar o ID
+import React, { useEffect, useState, useCallback } from "react";
 import { useForm, Controller } from "react-hook-form";
 import { z } from "zod";
-import type { Project } from "@/types"; // Importar o tipo Project atualizado
-import { createProject } from "@/services/projectService"; // Importar serviço
-import { useToast } from "@/hooks/use-toast"; // Para notificações
-
+import type { Project } from "@/types";
+import { getProjectById, updateProject } from "@/services/projectService";
+import { useToast } from "@/hooks/use-toast";
 
 const projectStatusOptions = [
   "Planejamento", "Orçamento", "Aprovado", "Em Andamento", "Concluído", "Cancelado"
 ];
 
-// Schema de validação Zod
 const projectFormSchema = z.object({
   projectName: z.string().min(3, "Nome do projeto deve ter no mínimo 3 caracteres."),
   clientName: z.string().min(2, "Nome do cliente é obrigatório."),
@@ -46,69 +45,97 @@ const projectFormSchema = z.object({
 
 type ProjectFormData = z.infer<typeof projectFormSchema>;
 
-export default function NewProjectPage() {
+export default function EditProjectPage() {
   const router = useRouter();
+  const params = useParams();
+  const projectId = params.id as string;
   const { toast } = useToast();
-  const { control, handleSubmit, formState: { errors, isSubmitting }, register, watch, setValue } = useForm<ProjectFormData>({
+  const [isLoading, setIsLoading] = useState(true);
+
+  const { control, handleSubmit, formState: { errors, isSubmitting }, reset, watch, setValue } = useForm<ProjectFormData>({
     resolver: zodResolver(projectFormSchema),
     defaultValues: {
       status: "Planejamento",
-      projectName: "",
-      clientName: "",
-      clientContact: "",
-      workAddress: "",
-      description: "",
-      totalArea: "",
-      budget: undefined,
     }
   });
 
-  const onSubmit = async (data: ProjectFormData) => {
+  const fetchProjectData = useCallback(async () => {
+    if (!projectId) return;
+    setIsLoading(true);
     try {
-      // Prepara os dados do projeto para o Firestore
-      const projectDataToSave: Omit<Project, 'id' | 'createdAt' | 'updatedAt'> = {
-        ...data,
-        startDate: data.startDate?.toISOString(), // Converte Date para string ISO
-        endDate: data.endDate?.toISOString(),
-        budgetItems: [], // Inicializa budgetItems
-        bdiPercentage: 25, // BDI padrão
-      };
-
-      await createProject(projectDataToSave);
-      
-      toast({
-        title: "Projeto Salvo!",
-        description: `O projeto "${data.projectName}" foi criado com sucesso.`,
-      });
-      router.push("/dashboard/projects");
+      const project = await getProjectById(projectId);
+      if (project) {
+        reset({
+          ...project,
+          startDate: project.startDate ? new Date(project.startDate) : undefined,
+          endDate: project.endDate ? new Date(project.endDate) : undefined,
+        });
+      } else {
+        toast({ title: "Projeto não encontrado", variant: "destructive" });
+        router.push("/dashboard/projects");
+      }
     } catch (error) {
-      console.error("Erro ao salvar projeto:", error);
+      console.error("Erro ao carregar projeto para edição:", error);
+      toast({ title: "Erro ao carregar projeto", variant: "destructive" });
+    } finally {
+      setIsLoading(false);
+    }
+  }, [projectId, reset, router, toast]);
+
+  useEffect(() => {
+    fetchProjectData();
+  }, [fetchProjectData]);
+
+  const onSubmit = async (data: ProjectFormData) => {
+    if (!projectId) return;
+    try {
+      const projectDataToUpdate: Partial<Omit<Project, 'id' | 'createdAt' | 'updatedAt' | 'budgetItems' | 'bdiPercentage'>> = {
+        ...data,
+        startDate: data.startDate?.toISOString(),
+        endDate: data.endDate?.toISOString(),
+      };
+      
+      await updateProject(projectId, projectDataToUpdate);
       toast({
-        title: "Erro ao salvar",
-        description: "Não foi possível salvar o projeto. Tente novamente.",
+        title: "Projeto Atualizado!",
+        description: `O projeto "${data.projectName}" foi atualizado com sucesso.`,
+      });
+      router.push(`/dashboard/projects/${projectId}`); // Volta para a página de detalhes
+    } catch (error) {
+      console.error("Erro ao atualizar projeto:", error);
+      toast({
+        title: "Erro ao atualizar",
+        description: "Não foi possível atualizar o projeto. Tente novamente.",
         variant: "destructive",
       });
     }
   };
-  
-  const budgetValue = watch("budget");
 
+  const budgetValue = watch("budget");
   const formatCurrency = (value: number | undefined) => {
     if (value === undefined || isNaN(value)) return "";
     return new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(value);
   };
 
+  if (isLoading) {
+    return (
+      <div className="flex justify-center items-center min-h-[calc(100vh-10rem)]">
+        <Loader2 className="h-10 w-10 animate-spin text-primary" />
+        <p className="ml-3 font-body text-lg">Carregando dados do projeto...</p>
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-8">
-       <Link href="/dashboard/projects" className="flex items-center text-sm text-primary hover:underline mb-6">
+       <Link href={`/dashboard/projects/${projectId}`} className="flex items-center text-sm text-primary hover:underline mb-6">
         <ArrowLeft className="mr-2 h-4 w-4" />
-        Voltar para Projetos
+        Voltar para Detalhes do Projeto
       </Link>
       <Card className="max-w-3xl mx-auto shadow-xl">
         <CardHeader>
-          <CardTitle className="text-2xl font-headline">Novo Projeto de Construção</CardTitle>
-          <CardDescription className="font-body">Preencha os detalhes abaixo para criar um novo projeto.</CardDescription>
+          <CardTitle className="text-2xl font-headline">Editar Projeto</CardTitle>
+          <CardDescription className="font-body">Modifique os detalhes do projeto abaixo.</CardDescription>
         </CardHeader>
         <CardContent>
           <form onSubmit={handleSubmit(onSubmit)} className="space-y-6">
@@ -128,7 +155,7 @@ export default function NewProjectPage() {
                   name="status"
                   control={control}
                   render={({ field }) => (
-                    <Select onValueChange={field.onChange} defaultValue={field.value}>
+                    <Select onValueChange={field.onChange} value={field.value}>
                       <SelectTrigger id="status">
                         <SelectValue placeholder="Selecione o status" />
                       </SelectTrigger>
@@ -275,13 +302,13 @@ export default function NewProjectPage() {
                 </div>
             </div>
 
-
             <div className="flex justify-end space-x-3 pt-4">
-              <Link href="/dashboard/projects">
+              <Link href={`/dashboard/projects/${projectId}`}>
                 <Button variant="outline" type="button" disabled={isSubmitting}>Cancelar</Button>
               </Link>
               <Button type="submit" className="bg-primary hover:bg-primary/90 text-primary-foreground" disabled={isSubmitting}>
-                {isSubmitting ? "Salvando..." : "Salvar Projeto"}
+                {isSubmitting ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : null}
+                Salvar Alterações
               </Button>
             </div>
           </form>
@@ -290,3 +317,7 @@ export default function NewProjectPage() {
     </div>
   );
 }
+
+// Criar a pasta e o arquivo se não existir
+// mkdir -p src/app/dashboard/projects/edit/[id]
+// touch src/app/dashboard/projects/edit/[id]/page.tsx

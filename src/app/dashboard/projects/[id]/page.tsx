@@ -2,16 +2,20 @@
 "use client";
 
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter } from "@/components/ui/card";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Separator } from "@/components/ui/separator";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { ArrowLeft, Edit, PlusCircle, Trash2, Printer, DollarSign, Percent } from "lucide-react";
+import { ArrowLeft, Edit, PlusCircle, Trash2, Printer, DollarSign, Percent, Loader2 } from "lucide-react";
 import Link from "next/link";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import React, { useState, useEffect } from "react";
-import type { Project, BudgetItem } from "../new/page"; // Importar o tipo Project
+import React, { useState, useEffect, useCallback } from "react";
+import type { Project, BudgetItem } from "@/types"; // Importar tipos atualizados
+import { getProjectById, updateProject, addBudgetItemToProject, deleteBudgetItemFromProject } from "@/services/projectService"; // Importar serviços
+import { useToast } from "@/hooks/use-toast";
+import { format } from "date-fns";
+import { ptBR } from "date-fns/locale";
 
 const getStatusBadgeClass = (status: string) => {
   switch (status) {
@@ -27,60 +31,117 @@ const getStatusBadgeClass = (status: string) => {
 
 export default function ProjectDetailsPage({ params }: { params: { id: string } }) {
   const [project, setProject] = useState<Project | null>(null);
-  const [bdiPercentage, setBdiPercentage] = useState<number>(25); // Default BDI
+  const [bdiPercentage, setBdiPercentage] = useState<number>(25);
   const [isLoading, setIsLoading] = useState(true);
+  const { toast } = useToast();
+
+  const fetchProjectDetails = useCallback(async () => {
+    setIsLoading(true);
+    try {
+      const currentProject = await getProjectById(params.id);
+      if (currentProject) {
+        setProject(currentProject);
+        setBdiPercentage(currentProject.bdiPercentage || 25);
+      } else {
+        setProject(null);
+        toast({ title: "Projeto não encontrado", variant: "destructive" });
+      }
+    } catch (error) {
+      console.error("Erro ao carregar detalhes do projeto:", error);
+      setProject(null);
+      toast({ title: "Erro ao carregar projeto", description: "Tente novamente mais tarde.", variant: "destructive" });
+    } finally {
+      setIsLoading(false);
+    }
+  }, [params.id, toast]);
 
   useEffect(() => {
-    const storedProjects = localStorage.getItem("projects");
-    if (storedProjects) {
-      try {
-        const allProjects: Project[] = JSON.parse(storedProjects);
-        const currentProject = allProjects.find(p => p.id === params.id);
-        if (currentProject) {
-          setProject(currentProject);
-          setBdiPercentage(currentProject.bdiPercentage || 25);
-        } else {
-          setProject(null);
-        }
-      } catch (error) {
-        console.error("Erro ao carregar detalhes do projeto do localStorage:", error);
-        setProject(null);
-      }
+    if (params.id) {
+      fetchProjectDetails();
     }
-    setIsLoading(false);
-  }, [params.id]);
+  }, [fetchProjectDetails, params.id]);
 
-  const handleBdiChange = (event: React.ChangeEvent<HTMLInputElement>) => {
+  const handleBdiChange = async (event: React.ChangeEvent<HTMLInputElement>) => {
     const value = event.target.value;
-    let numericValue = 0; // Default to 0 if input is cleared or invalid
-    if (value !== "") {
-        numericValue = parseFloat(value);
-        if (isNaN(numericValue)) {
-            numericValue = bdiPercentage; // Revert to old value if parsing fails
-        }
+    let numericValue = parseFloat(value);
+    if (isNaN(numericValue) || numericValue < 0) { // Garante que BDI não seja negativo ou NaN
+        numericValue = 0; // Ou reverter para o valor anterior, ou manter o estado atual
     }
     setBdiPercentage(numericValue);
 
     if (project) {
-        const updatedProject = { ...project, bdiPercentage: numericValue };
-        const storedProjectsString = localStorage.getItem("projects");
-        if (storedProjectsString) {
-            try {
-                let allProjects: Project[] = JSON.parse(storedProjectsString);
-                allProjects = allProjects.map(p => p.id === project.id ? updatedProject : p);
-                localStorage.setItem("projects", JSON.stringify(allProjects));
-                setProject(updatedProject); // Update local state
-            } catch (error) {
-                console.error("Erro ao atualizar BDI no localStorage:", error);
-            }
+        try {
+            await updateProject(project.id, { bdiPercentage: numericValue });
+            setProject(prev => prev ? {...prev, bdiPercentage: numericValue} : null); // Atualiza estado local otimista
+            // Toast sutil para indicar que foi salvo, opcional
+            // toast({ title: "BDI Atualizado", description: "A margem BDI foi salva.", duration: 2000}); 
+        } catch (error) {
+            console.error("Erro ao atualizar BDI no Firestore:", error);
+            toast({ title: "Erro ao salvar BDI", variant: "destructive" });
+            // Reverter a mudança no estado local se a atualização falhar
+            setBdiPercentage(project.bdiPercentage || 25); 
+        }
+    }
+  };
+  
+  const formatDate = (dateString?: string) => {
+    if (!dateString) return "N/A";
+     try {
+      const date = new Date(dateString);
+      if (isNaN(date.getTime())) return 'Data Inválida';
+      return format(date, "P", { locale: ptBR });
+    } catch (e) {
+      return 'Data Inválida';
+    }
+  };
+
+
+  const handleAddBudgetItem = async () => {
+    if (!project) return;
+    // Lógica para adicionar novo item (abrir modal, etc.)
+    // Por enquanto, apenas um log para teste e para adicionar um item mock
+    const newItemName = prompt("Nome do novo item de orçamento:", "Novo Material de Teste");
+    if (!newItemName) return;
+
+    const newItem: BudgetItem = {
+      id: `item-${Date.now()}`, // Gerar ID único no cliente
+      type: "Material",
+      name: newItemName,
+      unit: "Un",
+      quantity: 1,
+      unitPrice: 10,
+      total: 10
+    };
+    try {
+      await addBudgetItemToProject(project.id, newItem);
+      fetchProjectDetails(); // Re-busca o projeto para atualizar a lista
+      toast({ title: "Item Adicionado", description: `${newItem.name} adicionado ao orçamento.`});
+    } catch (error) {
+      console.error("Erro ao adicionar item ao orçamento:", error);
+      toast({ title: "Erro ao adicionar item", variant: "destructive"});
+    }
+  };
+  
+  const handleDeleteBudgetItem = async (itemId: string, itemName: string) => {
+    if (!project || !project.budgetItems) return;
+    if (confirm(`Tem certeza que deseja excluir o item "${itemName}" do orçamento?`)) {
+        try {
+            await deleteBudgetItemFromProject(project.id, itemId);
+            fetchProjectDetails(); // Re-busca o projeto
+            toast({ title: "Item Excluído", description: `${itemName} excluído do orçamento.`});
+        } catch (error) {
+            console.error("Erro ao excluir item do orçamento:", error);
+            toast({ title: "Erro ao excluir item", variant: "destructive"});
         }
     }
   };
 
+
   if (isLoading) {
     return (
-      <div className="flex justify-center items-center h-screen">
-        <p className="font-body text-lg">Carregando detalhes do projeto...</p>
+      <div className="flex justify-center items-center min-h-[calc(100vh-10rem)]">
+        <Loader2 className="h-10 w-10 animate-spin text-primary" />
+        <p className="ml-3 font-body text-lg">Carregando detalhes do projeto...</p>
       </div>
     );
   }
@@ -97,7 +158,7 @@ export default function ProjectDetailsPage({ params }: { params: { id: string } 
             <CardTitle className="text-2xl font-headline text-destructive">Projeto não encontrado</CardTitle>
           </CardHeader>
           <CardContent>
-            <p className="font-body">O projeto que você está tentando acessar não foi encontrado. Ele pode ter sido excluído ou o ID é inválido.</p>
+            <p className="font-body">O projeto que você está tentando acessar não foi encontrado.</p>
             <Button asChild className="mt-4">
               <Link href="/dashboard/projects">Ver todos os projetos</Link>
             </Button>
@@ -113,61 +174,6 @@ export default function ProjectDetailsPage({ params }: { params: { id: string } 
   const subTotalCost = totalMaterialsCost + totalServicesCost;
   const bdiValue = subTotalCost * (bdiPercentage / 100);
   const totalProjectCost = subTotalCost + bdiValue;
-
-  // Placeholder para adicionar item ao orçamento
-  const handleAddBudgetItem = () => {
-    // Lógica para adicionar novo item (abrir modal, etc.)
-    // Por enquanto, apenas um log para teste e para adicionar um item mock
-    const newItem: BudgetItem = {
-      id: `item-${Date.now()}`,
-      type: "Material",
-      name: "Novo Material de Teste",
-      unit: "Un",
-      quantity: 10,
-      unitPrice: 5.50,
-      total: 55.00
-    };
-    const updatedProject = {
-      ...project,
-      budgetItems: [...(project.budgetItems || []), newItem]
-    };
-    setProject(updatedProject); // Atualiza o estado local
-
-    // Salva no localStorage
-    const storedProjectsString = localStorage.getItem("projects");
-    if (storedProjectsString) {
-        try {
-            let allProjects: Project[] = JSON.parse(storedProjectsString);
-            allProjects = allProjects.map(p => p.id === project.id ? updatedProject : p);
-            localStorage.setItem("projects", JSON.stringify(allProjects));
-        } catch (error) {
-            console.error("Erro ao adicionar item ao orçamento no localStorage:", error);
-        }
-    }
-    console.log("Adicionar item ao orçamento:", newItem);
-  };
-  
-  const handleDeleteBudgetItem = (itemId: string) => {
-    if (!project || !project.budgetItems) return;
-    if (confirm("Tem certeza que deseja excluir este item do orçamento?")) {
-        const updatedBudgetItems = project.budgetItems.filter(item => item.id !== itemId);
-        const updatedProject = { ...project, budgetItems: updatedBudgetItems };
-        setProject(updatedProject); // Atualiza o estado local
-
-        // Salva no localStorage
-        const storedProjectsString = localStorage.getItem("projects");
-        if (storedProjectsString) {
-            try {
-                let allProjects: Project[] = JSON.parse(storedProjectsString);
-                allProjects = allProjects.map(p => p.id === project.id ? updatedProject : p);
-                localStorage.setItem("projects", JSON.stringify(allProjects));
-            } catch (error) {
-                console.error("Erro ao excluir item do orçamento no localStorage:", error);
-            }
-        }
-    }
-  };
-
 
   return (
     <div className="space-y-8">
@@ -186,7 +192,7 @@ export default function ProjectDetailsPage({ params }: { params: { id: string } 
             <CardDescription className="font-body mt-1">Detalhes e orçamento do projeto.</CardDescription>
           </div>
           <div className="mt-4 sm:mt-0 flex space-x-2">
-            <Button variant="outline" onClick={() => alert("Função Editar Projeto ainda não implementada.")}><Edit className="mr-2 h-4 w-4" /> Editar Projeto</Button>
+            <Button variant="outline" onClick={() => router.push(`/dashboard/projects/edit/${project.id}`)}><Edit className="mr-2 h-4 w-4" /> Editar Projeto</Button>
             <Button variant="outline" onClick={() => window.print()}><Printer className="mr-2 h-4 w-4" /> Imprimir Orçamento</Button>
           </div>
         </CardHeader>
@@ -197,8 +203,8 @@ export default function ProjectDetailsPage({ params }: { params: { id: string } 
               <div><strong>Cliente:</strong> {project.clientName}</div>
               <div><strong>Contato:</strong> {project.clientContact || "N/A"}</div>
               <div><strong>Endereço da Obra:</strong> {project.workAddress}</div>
-              <div><strong>Data de Início:</strong> {project.startDate ? new Date(project.startDate).toLocaleDateString('pt-BR') : "N/A"}</div>
-              <div><strong>Data de Fim Prevista:</strong> {project.endDate ? new Date(project.endDate).toLocaleDateString('pt-BR') : "N/A"}</div>
+              <div><strong>Data de Início:</strong> {formatDate(project.startDate)}</div>
+              <div><strong>Data de Fim Prevista:</strong> {formatDate(project.endDate)}</div>
               <div><strong>Área Total:</strong> {project.totalArea || "N/A"}</div>
             </div>
             {project.description && (
@@ -244,10 +250,10 @@ export default function ProjectDetailsPage({ params }: { params: { id: string } 
                     <TableCell className="text-right">{item.unitPrice.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</TableCell>
                     <TableCell className="text-right">{item.total.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</TableCell>
                     <TableCell className="text-center">
-                      <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => alert(`Editar item ${item.id} (não implementado)`)}>
+                      <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => alert(`Editar item ${item.name} (não implementado completamente)`)}>
                         <Edit className="h-4 w-4" />
                       </Button>
-                      <Button variant="ghost" size="icon" className="h-8 w-8 text-destructive" onClick={() => handleDeleteBudgetItem(item.id)}>
+                      <Button variant="ghost" size="icon" className="h-8 w-8 text-destructive" onClick={() => handleDeleteBudgetItem(item.id, item.name)}>
                         <Trash2 className="h-4 w-4" />
                       </Button>
                     </TableCell>
@@ -267,7 +273,7 @@ export default function ProjectDetailsPage({ params }: { params: { id: string } 
           <Separator />
           
           <section className="grid grid-cols-1 md:grid-cols-2 gap-6 items-start">
-            <div> </div>
+            <div>{/* Espaço reservado, pode ser usado para mais detalhes ou gráficos no futuro */}</div>
             <Card className="bg-muted/30">
               <CardHeader>
                 <CardTitle className="font-headline text-lg">Resumo do Orçamento</CardTitle>
@@ -317,5 +323,3 @@ export default function ProjectDetailsPage({ params }: { params: { id: string } 
     </div>
   );
 }
-
-    
