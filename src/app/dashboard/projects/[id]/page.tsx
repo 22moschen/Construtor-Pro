@@ -7,6 +7,7 @@ import { Separator } from "@/components/ui/separator";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { ArrowLeft, Edit, PlusCircle, Trash2, Printer, DollarSign, Percent, Loader2 } from "lucide-react";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -34,6 +35,7 @@ export default function ProjectDetailsPage({ params }: { params: { id: string } 
   const [bdiPercentage, setBdiPercentage] = useState<number>(25);
   const [isLoading, setIsLoading] = useState(true);
   const { toast } = useToast();
+  const router = useRouter();
 
   const fetchProjectDetails = useCallback(async () => {
     setIsLoading(true);
@@ -64,21 +66,18 @@ export default function ProjectDetailsPage({ params }: { params: { id: string } 
   const handleBdiChange = async (event: React.ChangeEvent<HTMLInputElement>) => {
     const value = event.target.value;
     let numericValue = parseFloat(value);
-    if (isNaN(numericValue) || numericValue < 0) { // Garante que BDI não seja negativo ou NaN
-        numericValue = 0; // Ou reverter para o valor anterior, ou manter o estado atual
+    if (isNaN(numericValue) || numericValue < 0) {
+        numericValue = 0;
     }
     setBdiPercentage(numericValue);
 
     if (project) {
         try {
             await updateProject(project.id, { bdiPercentage: numericValue });
-            setProject(prev => prev ? {...prev, bdiPercentage: numericValue} : null); // Atualiza estado local otimista
-            // Toast sutil para indicar que foi salvo, opcional
-            // toast({ title: "BDI Atualizado", description: "A margem BDI foi salva.", duration: 2000}); 
+            setProject(prev => prev ? {...prev, bdiPercentage: numericValue} : null);
         } catch (error) {
             console.error("Erro ao atualizar BDI no Firestore:", error);
             toast({ title: "Erro ao salvar BDI", variant: "destructive" });
-            // Reverter a mudança no estado local se a atualização falhar
             setBdiPercentage(project.bdiPercentage || 25); 
         }
     }
@@ -98,13 +97,11 @@ export default function ProjectDetailsPage({ params }: { params: { id: string } 
 
   const handleAddBudgetItem = async () => {
     if (!project) return;
-    // Lógica para adicionar novo item (abrir modal, etc.)
-    // Por enquanto, apenas um log para teste e para adicionar um item mock
     const newItemName = prompt("Nome do novo item de orçamento:", "Novo Material de Teste");
     if (!newItemName) return;
 
     const newItem: BudgetItem = {
-      id: `item-${Date.now()}`, // Gerar ID único no cliente
+      id: `item-${Date.now()}`,
       type: "Material",
       name: newItemName,
       unit: "Un",
@@ -114,7 +111,7 @@ export default function ProjectDetailsPage({ params }: { params: { id: string } 
     };
     try {
       await addBudgetItemToProject(project.id, newItem);
-      fetchProjectDetails(); // Re-busca o projeto para atualizar a lista
+      fetchProjectDetails();
       toast({ title: "Item Adicionado", description: `${newItem.name} adicionado ao orçamento.`});
     } catch (error) {
       console.error("Erro ao adicionar item ao orçamento:", error);
@@ -127,7 +124,7 @@ export default function ProjectDetailsPage({ params }: { params: { id: string } 
     if (confirm(`Tem certeza que deseja excluir o item "${itemName}" do orçamento?`)) {
         try {
             await deleteBudgetItemFromProject(project.id, itemId);
-            fetchProjectDetails(); // Re-busca o projeto
+            fetchProjectDetails();
             toast({ title: "Item Excluído", description: `${itemName} excluído do orçamento.`});
         } catch (error) {
             console.error("Erro ao excluir item do orçamento:", error);
@@ -273,7 +270,7 @@ export default function ProjectDetailsPage({ params }: { params: { id: string } 
           <Separator />
           
           <section className="grid grid-cols-1 md:grid-cols-2 gap-6 items-start">
-            <div>{/* Espaço reservado, pode ser usado para mais detalhes ou gráficos no futuro */}</div>
+            <div></div>
             <Card className="bg-muted/30">
               <CardHeader>
                 <CardTitle className="font-headline text-lg">Resumo do Orçamento</CardTitle>
@@ -323,3 +320,5 @@ export default function ProjectDetailsPage({ params }: { params: { id: string } 
     </div>
   );
 }
+
+    
