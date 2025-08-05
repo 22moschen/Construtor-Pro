@@ -1,0 +1,88 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+body {
+  font-family: var(--font-body), Arial, Helvetica, sans-serif;
+}
+
+@layer base {
+  :root {
+    --background: 220 17% 95%; /* Light Gray #F0F2F5 */
+    --foreground: 220 10% 20%; /* Darker gray for text */
+    --card: 0 0% 100%;
+    --card-foreground: 220 10% 20%;
+    --popover: 0 0% 100%;
+    --popover-foreground: 220 10% 20%;
+    --primary: 225 100% 58%; /* Strong Blue #2962FF */
+    --primary-foreground: 0 0% 100%;
+    --secondary: 220 15% 85%; /* Lighter gray for secondary elements */
+    --secondary-foreground: 220 10% 20%;
+    --muted: 220 15% 88%;
+    --muted-foreground: 220 10% 45%;
+    --accent: 20 100% 66%; /* Warm Orange #FF8F54 */
+    --accent-foreground: 0 0% 100%;
+    --destructive: 0 84.2% 60.2%;
+    --destructive-foreground: 0 0% 98%;
+    --border: 220 15% 80%;
+    --input: 220 15% 85%;
+    --ring: 225 100% 58%; /* Primary color for rings */
+    --chart-1: 225 100% 58%;
+    --chart-2: 20 100% 66%;
+    --chart-3: 173 58% 39%;
+    --chart-4: 43 74% 66%;
+    --chart-5: 27 87% 67%;
+    --radius: 0.5rem;
+
+    /* Sidebar specific variables - can be themed separately or inherit */
+    --sidebar-background: 0 0% 100%; /* White sidebar background */
+    --sidebar-foreground: 220 10% 25%;
+    --sidebar-primary: 225 100% 58%; /* Use main primary for active/hover */
+    --sidebar-primary-foreground: 0 0% 100%;
+    --sidebar-accent: 220 17% 92%; /* Light gray for hover */
+    --sidebar-accent-foreground: 225 100% 58%;
+    --sidebar-border: 220 15% 88%;
+    --sidebar-ring: 225 100% 58%;
+  }
+
+  .dark {
+    --background: 220 10% 10%;
+    --foreground: 0 0% 98%;
+    --card: 220 10% 12%;
+    --card-foreground: 0 0% 98%;
+    --popover: 220 10% 12%;
+    --popover-foreground: 0 0% 98%;
+    --primary: 225 100% 65%;
+    --primary-foreground: 220 10% 5%;
+    --secondary: 220 10% 20%;
+    --secondary-foreground: 0 0% 98%;
+    --muted: 220 10% 20%;
+    --muted-foreground: 0 0% 63.9%;
+    --accent: 20 100% 70%;
+    --accent-foreground: 220 10% 5%;
+    --destructive: 0 62.8% 30.6%;
+    --destructive-foreground: 0 0% 98%;
+    --border: 220 10% 25%;
+    --input: 220 10% 25%;
+    --ring: 225 100% 65%;
+
+    --sidebar-background: 220 10% 15%;
+    --sidebar-foreground: 0 0% 95%;
+    --sidebar-primary: 225 100% 65%;
+    --sidebar-primary-foreground: 220 10% 5%;
+    --sidebar-accent: 220 10% 22%;
+    --sidebar-accent-foreground: 225 100% 65%;
+    --sidebar-border: 220 10% 25%;
+    --sidebar-ring: 225 100% 65%;
+  }
+}
+
+@layer base {
+  * {
+    @apply border-border;
+  }
+  body {
+    @apply bg-background text-foreground;
+    font-feature-settings: "rlig" 1, "calt" 1;
+  }
+}
