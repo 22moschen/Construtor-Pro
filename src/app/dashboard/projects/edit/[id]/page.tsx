@@ -23,6 +23,8 @@ import type { Project } from "@/types";
 import { getProjectById, updateProject } from "@/services/projectService";
 import { useToast } from "@/hooks/use-toast";
 
+export const dynamic = 'force-dynamic';
+
 const projectStatusOptions = [
   "Planejamento", "Orçamento", "Aprovado", "Em Andamento", "Concluído", "Cancelado"
 ];
