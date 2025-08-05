@@ -317,7 +317,3 @@ export default function EditProjectPage() {
     </div>
   );
 }
-
-// Criar a pasta e o arquivo se não existir
-// mkdir -p src/app/dashboard/projects/edit/[id]
-// touch src/app/dashboard/projects/edit/[id]/page.tsx
