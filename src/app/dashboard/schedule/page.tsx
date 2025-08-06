@@ -6,6 +6,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Badge } from "@/components/ui/badge";
 import { PlusCircle, Edit, Trash2, AlertTriangle, CheckCircle, Clock } from "lucide-react";
 import React, { useState } from "react";
+import { ptBR } from "date-fns/locale";
 
 // Mock data
 const tasks = [
@@ -66,7 +67,7 @@ export default function SchedulePage() {
               selected={date}
               onSelect={setDate}
               className="rounded-md border p-0"
-              locale={require("date-fns/locale/pt-BR").ptBR}
+              locale={ptBR}
             />
           </CardContent>
         </Card>
